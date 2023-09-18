@@ -1,0 +1,68 @@
+import cv2
+import numpy as np
+import tensorflow as tf
+
+# Load the pre-trained MobileNetV2 model for face detection
+model = tf.keras.applications.MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Define a function to detect faces in a frame
+def detect_faces(frame, model):
+    # Resize the frame to (224, 224)
+    resized_frame = cv2.resize(frame, (224, 224))
+    
+    # Convert to float and expand dimensions
+    input_tensor = tf.convert_to_tensor(resized_frame, dtype=tf.float32)
+    input_tensor = tf.expand_dims(input_tensor, axis=0)
+    
+    detections = model(input_tensor)
+    
+    # Access the detection results correctly
+    num_detected_faces = int(tf.shape(detections['detection_boxes'])[1])
+    detected_faces = []
+    
+    for i in range(num_detected_faces):
+        box = detections['detection_boxes'][0, i].numpy()
+        score = detections['detection_scores'][0, i].numpy()
+        
+        if score > 0.5:  # Adjust the confidence threshold as needed
+            detected_faces.append(box)
+    
+    return detected_faces, num_detected_faces
+
+# Rest of your code remains the same
+
+
+# Open the video file for reading
+cap = cv2.VideoCapture(r'C:\Users\Ameyo\Downloads\faces01 (1) (2).mp4')
+
+# Get the video's frames per second (fps) and frame dimensions
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+# Define the codec and create a VideoWriter object to save the edited video
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter('output_video.avi', fourcc, fps, (width, height))
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    detected_faces, num_detected_faces = detect_faces(frame, model)
+
+    # Format the text to display at the right-hand corner
+    text = f'Face detected: {len(detected_faces)}, Total Faces: {num_detected_faces}'
+    
+    # Add the text to the frame
+    cv2.putText(frame, text, (width - 350, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    for box in detected_faces:
+        y1, x1, y2, x2 = map(int, box * np.array([height, width, height, width]))
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    out.write(frame)
+
+cap.release()
+out.release()
+cv2.destroyAllWindows()
